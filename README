@@ -2,4 +2,6 @@ Tool for hosting files over http
 
 usage: ./chuck.py --port 9999 <path>
 
-This will allow users to visit localhost:9999 which will cause the file located at path to be downloaded
+This will allow users to visit http://localhost:9999 which will cause the file located at path to be downloaded
+
+If <path> is a directory, then chuck.py will compress it into a zip file.
