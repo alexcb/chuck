@@ -34,7 +34,8 @@ def get_data_to_serve(path):
     if os.path.isfile(path):
         return os.path.basename(path), open(path, 'rb').read()
 
-    basename = os.path.basename(os.path.abspath(path))
+    path = os.path.abspath(path)
+    basename = os.path.basename(path)
     attachment_name = basename + '.zip'
  
     in_memory = BytesIO()
@@ -43,7 +44,7 @@ def get_data_to_serve(path):
     for dir_path, subdirs, files in os.walk(path, topdown=False):
         for fname in files:
             zippath = f'{dir_path}/{fname}'
-            fullpath = os.path.join(path, dir_path, zippath)
+            fullpath = os.path.join(path, zippath)
 
             # dont expose system path in zip file
             assert zippath.startswith(path)
@@ -51,7 +52,6 @@ def get_data_to_serve(path):
             assert zippath.startswith('/')
             zippath = basename + zippath
 
-            print(zippath)
             zf.writestr(zippath, open(fullpath, 'rb').read())
 
     zf.close()
