@@ -6,6 +6,7 @@ import socketserver
 import argparse
 
 from http import HTTPStatus
+from netifaces import interfaces, ifaddresses, AF_INET
 
 # globals
 shared_data = None
@@ -37,10 +38,32 @@ def main():
     shared_data = open(path, 'rb').read()
     shared_data_filename = os.path.basename(path)
 
+    ip_addresses = filter_ip_addresses(ip4_addresses())
+
     socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(('', args.port), Handler) as httpd:
-        print(f'serving on port {args.port}')
+        if ip_addresses:
+            for addr in ip_addresses:
+                print(f'serving on http://{addr}:{args.port}')
+        else:
+            print(f'serving on port {args.port} (failed to guess IP)')
         httpd.serve_forever()
+
+def ip4_addresses():
+    ip_list = []
+    for interface in interfaces():
+        for link in ifaddresses(interface)[AF_INET]:
+            ip_list.append(link['addr'])
+    return ip_list
+
+def filter_ip_addresses(ip_list):
+    def ignored(x):
+        if x.startswith('127.'):
+            return True
+        if x.startswith('172.'):
+            return True
+        return False
+    return [x for x in ip_list if not ignored(x)]
 
 if __name__ == '__main__':
     main()
