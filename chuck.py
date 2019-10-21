@@ -30,7 +30,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 def main():
     global shared_data, shared_data_filename
     parser = argparse.ArgumentParser(description='shares files (or directories) over http')
-    parser.add_argument('--port', default=8394, help='port to share on')
+    parser.add_argument('--port', default=9999, help='port to share on')
     parser.add_argument('path', nargs=1, help='path to share')
     
     args = parser.parse_args()
