@@ -1,0 +1,5 @@
+Tool for hosting files over http
+
+usage: ./chuck.py --port 9384 <path>
+
+This will allow users to visit localhost:9384 which will cause the file located at path to be downloaded
