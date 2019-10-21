@@ -8,6 +8,9 @@ import argparse
 from http import HTTPStatus
 from netifaces import interfaces, ifaddresses, AF_INET
 
+from zipfile import ZipFile
+from io import BytesIO
+
 # globals
 shared_data = None
 shared_data_filename = None
@@ -27,6 +30,36 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         self.wfile.write(shared_data)
 
+def get_data_to_serve(path):
+    if os.path.isfile(path):
+        return os.path.basename(path), open(path, 'rb').read()
+
+    basename = os.path.basename(os.path.abspath(path))
+    attachment_name = basename + '.zip'
+ 
+    in_memory = BytesIO()
+    zf = ZipFile(in_memory, mode="w")
+
+    for dir_path, subdirs, files in os.walk(path, topdown=False):
+        for fname in files:
+            zippath = f'{dir_path}/{fname}'
+            fullpath = os.path.join(path, dir_path, zippath)
+
+            # dont expose system path in zip file
+            assert zippath.startswith(path)
+            zippath = zippath[len(path):]
+            assert zippath.startswith('/')
+            zippath = basename + zippath
+
+            print(zippath)
+            zf.writestr(zippath, open(fullpath, 'rb').read())
+
+    zf.close()
+
+    in_memory.seek(0)
+    return attachment_name, in_memory.read()
+    
+
 def main():
     global shared_data, shared_data_filename
     parser = argparse.ArgumentParser(description='shares files (or directories) over http')
@@ -34,9 +67,9 @@ def main():
     parser.add_argument('path', nargs=1, help='path to share')
     
     args = parser.parse_args()
+    assert len(args.path) == 1
     path = args.path[0]
-    shared_data = open(path, 'rb').read()
-    shared_data_filename = os.path.basename(path)
+    shared_data_filename, shared_data = get_data_to_serve(path)
 
     ip_addresses = filter_ip_addresses(ip4_addresses())
 
@@ -52,7 +85,8 @@ def main():
 def ip4_addresses():
     ip_list = []
     for interface in interfaces():
-        for link in ifaddresses(interface)[AF_INET]:
+        ifs = ifaddresses(interface)
+        for link in ifs.get(AF_INET, []):
             ip_list.append(link['addr'])
     return ip_list
 
