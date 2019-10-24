@@ -93,11 +93,17 @@ def discover_others():
     client.sendto(MAGIC_GREETING, ('<broadcast>', UDP_PORT))
     client.settimeout(0.2)
 
+    results = set()
+
     with suppress(socket.timeout):
         while True:
             data, (client_ip, client_port) = client.recvfrom(1024)
             port, fname = data.decode('utf8').split(' ', 1)
-            print(f'http://{client_ip}:{port} - {fname}')
+            results.add((fname, f'http://{client_ip}:{port}'))
+
+    results = sorted([x for x in results])
+    for name, url in results:
+        print(f'{name} - {url}')
 
 
 def main():
