@@ -4,16 +4,26 @@ import os
 import os.path
 import socketserver
 import argparse
+import socket
+import sys
+import threading
 
 from http import HTTPStatus
 from netifaces import interfaces, ifaddresses, AF_INET
 
 from zipfile import ZipFile
 from io import BytesIO
+from contextlib import suppress
+
+
+# conts
+MAGIC_GREETING = b'hello chuckers'
+UDP_PORT = 37101
 
 # globals
 shared_data = None
 shared_data_filename = None
+done_running = False
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -58,29 +68,72 @@ def get_data_to_serve(path):
 
     in_memory.seek(0)
     return attachment_name, in_memory.read()
-    
+
+
+def listen_broadcast(name, http_port):
+    global done_running
+
+    serv = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
+    serv.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    serv.bind(('', UDP_PORT))
+    serv.settimeout(0.1)
+
+    while not done_running:
+        with suppress(socket.timeout):
+            data, (client_ip, client_port) = serv.recvfrom(1024)
+            if data == MAGIC_GREETING:
+                msg = f'{http_port} {name}'.encode('utf8')
+                serv.sendto(msg, (client_ip, client_port))
+                print(f'replied to UDP discover {client_ip}:{client_port}')
+
+
+def discover_others():
+    client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    client.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    client.sendto(MAGIC_GREETING, ('<broadcast>', UDP_PORT))
+    client.settimeout(0.2)
+
+    with suppress(socket.timeout):
+        while True:
+            data, (client_ip, client_port) = client.recvfrom(1024)
+            port, fname = data.decode('utf8').split(' ', 1)
+            print(f'http://{client_ip}:{port} - {fname}')
+
 
 def main():
-    global shared_data, shared_data_filename
+    global shared_data, shared_data_filename, done_running
     parser = argparse.ArgumentParser(description='shares files (or directories) over http')
+    parser.add_argument('-l', '--list', action='store_true', help='discover chuckers on the local network')
     parser.add_argument('--port', default=9999, help='port to share on')
-    parser.add_argument('path', nargs=1, help='path to share')
-    
+    parser.add_argument('path', nargs='?', help='path to share')
+
     args = parser.parse_args()
-    assert len(args.path) == 1
-    path = args.path[0]
-    shared_data_filename, shared_data = get_data_to_serve(path)
+    if args.list:
+        return discover_others()
+
+    if args.path is None:
+        print('missing path argument')
+        sys.exit(1)
+
+    shared_data_filename, shared_data = get_data_to_serve(args.path)
 
     ip_addresses = filter_ip_addresses(ip4_addresses())
 
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(('', args.port), Handler) as httpd:
-        if ip_addresses:
-            for addr in ip_addresses:
-                print(f'serving on http://{addr}:{args.port}')
-        else:
-            print(f'serving on port {args.port} (failed to guess IP)')
-        httpd.serve_forever()
+    udp_listener = threading.Thread(target = listen_broadcast, args = (shared_data_filename, args.port))
+    udp_listener.start()
+
+    with suppress(KeyboardInterrupt):
+        socketserver.TCPServer.allow_reuse_address = True
+        with socketserver.TCPServer(('', args.port), Handler) as httpd:
+            if ip_addresses:
+                for addr in ip_addresses:
+                    print(f'serving on http://{addr}:{args.port}')
+            else:
+                print(f'serving on port {args.port} (failed to guess IP)')
+            httpd.serve_forever()
+
+    done_running = True
+    udp_listener.join()
 
 def ip4_addresses():
     ip_list = []

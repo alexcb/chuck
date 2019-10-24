@@ -1,7 +1,30 @@
 Tool for hosting files over http
 
-usage: ./chuck.py --port 9999 <path>
+To host a file (or directory) run:
+
+   ./chuck.py --port 9999 <path>
+
+If <path> is a directory, then chuck.py will compress host the entire directory as a zip file.
 
 This will allow users to visit http://localhost:9999 which will cause the file located at path to be downloaded
 
-If <path> is a directory, then chuck.py will compress it into a zip file.
+Alternatively if a user already has chuck installed on the receiving computer; one may run:
+
+   ./chuck.py --list
+
+to discover all running chuck servers on the local network.
+
+
+Example of using chuck to share a copy of itself:
+
+    ./chuck.py chuck.py
+
+This will output:
+
+   serving on http://192.168.0.103:9999
+
+Open this URL in a browser and chuck.py will be downloaded; alternatively on the command line this can be downloaded with wget:
+
+    wget --content-disposition http://192.168.0.103:9999
+
+which will save it as chuck.py
