@@ -110,7 +110,7 @@ def main():
     global shared_data, shared_data_filename, done_running
     parser = argparse.ArgumentParser(description='shares files (or directories) over http')
     parser.add_argument('-l', '--list', action='store_true', help='discover chuckers on the local network')
-    parser.add_argument('--port', default=9999, help='port to share on')
+    parser.add_argument('--port', default=9999, type=int, help='port to share on')
     parser.add_argument('path', nargs='?', help='path to share')
 
     args = parser.parse_args()
